@@ -1,1 +1,5 @@
-
+const int MUX_SIG = 34; 
+const int S0 = 16; const int S1 = 5; const int S2 = 18; const int S3 = 19;
+const int AIN1 = 13; const int AIN2 = 14; const int PWMA = 26;
+const int BIN1 = 12; const int BIN2 = 27; const int PWMB = 25;
+const int STBY = 33;
