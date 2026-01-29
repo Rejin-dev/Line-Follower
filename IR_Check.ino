@@ -1,4 +1,7 @@
 // ================= CONFIGURATION =================
+// Set this to 'false' when running the robot on the track!
+// Set to 'true' only when testing/calibrating sensors.
+const bool DEBUG_MODE = true; 
 
 // --- Pin Definitions (ESP32) ---
 const int MUX_SIG = 34; // ADC1_CH6
@@ -33,7 +36,16 @@ void setup() {
 
 void loop() {
   readSensors();
+
+  if (DEBUG_MODE) {
+    printSensorData();
+  }
+
+  // --- YOUR PID / MOTOR LOGIC GOES HERE ---
+  // calculatePID();
+  // driveMotors();
 }
+
 // Function to read all 12 sensors efficiently
 void readSensors() {
   for (int i = 0; i < NUM_SENSORS; i++) {
