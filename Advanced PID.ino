@@ -36,6 +36,14 @@ int whiteValues[12];
 // --- Logic Variables ---
 float error = 0, lastError = 0, integral = 0;
 bool motorRunning = false;
+
+// --- Timer Variables for Finish Line ---
+unsigned long runStartTime = 0;
+const unsigned long ignoreStartTime = 2000;  // Ignore finish line for first 2000ms (2s)
+unsigned long blackDetectStartTime = 0;
+const unsigned long requiredBlackTime = 100; // Must see full black continuously for 100ms
+bool isTimingBlack = false;
+
 unsigned long lastDebounceTime = 0;
 const int debounceDelay = 200;
 
@@ -187,6 +195,37 @@ void calculatePID()
       count++;
     }
   }
+  // ==========================================
+  // --- Continuous Finish Line Detection ---
+  // ==========================================
+  
+  // Check if the initial 2-second ignore window has passed
+  if (millis() - runStartTime > ignoreStartTime) 
+  {
+    // If 10 or more sensors see black (Using 10 prevents false positives on curves)
+    if (count >= 10) 
+    {
+      if (!isTimingBlack) 
+      {
+        // We just hit full black. Start the stopwatch.
+        isTimingBlack = true;
+        blackDetectStartTime = millis();
+      } 
+      else if (millis() - blackDetectStartTime > requiredBlackTime) 
+      {
+        // We have been on full black continuously for over 100ms! It's the finish.
+        motorRunning = false;
+        driveMotors(0, 0);
+        return; // Exit the function immediately 
+      }
+    } 
+    else 
+    {
+      // The moment the count drops below 10, reset the stopwatch.
+      isTimingBlack = false;
+    }
+  }
+  // ==========================================
   
   if (count > 0)
   {
@@ -253,6 +292,16 @@ void checkButtons()
     if (millis() - lastDebounceTime > debounceDelay)
     {
       motorRunning = !motorRunning;
+      
+      //Reset variables on a fresh start ---
+      if (motorRunning) 
+      {
+        runStartTime = millis();
+        isTimingBlack = false;
+        integral = 0;
+        lastError = 0;
+      }
+      
       lastDebounceTime = millis();
     }
   }
