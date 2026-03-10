@@ -48,6 +48,10 @@ const int debounceDelay = 200;
 int runtime = 0;
 bool trackFinished = false;
 
+// --- Streaming Variables ---
+unsigned long lastStreamTime = 0;
+const int streamInterval = 100; // Streams data every 100ms to avoid Bluetooth flooding
+
 void setup() {
   Serial.begin(115200);
   SerialBT.begin("ESP32_PID_Pro");
@@ -83,6 +87,7 @@ void setup() {
 void loop() {
   checkButtons();
   handleBluetooth();
+  streamSensorData(); // Continuously streams data without a trigger
 
   if (motorRunning) {
     calculatePID();
@@ -90,6 +95,19 @@ void loop() {
     driveMotors(0, 0);
     integral = 0;
     lastError = 0;
+  }
+}
+
+// --- New Streaming Function ---
+void streamSensorData() {
+  if (millis() - lastStreamTime >= streamInterval) {
+    lastStreamTime = millis();
+    String dataStr = "SENSORS:";
+    for (int i = 0; i < 12; i++) {
+      dataStr += String(readMux(i));
+      if (i < 11) dataStr += ",";
+    }
+    SerialBT.println(dataStr);
   }
 }
 
@@ -182,7 +200,6 @@ void handleCommand(String cmd) {
   }
 }
 
-
 void handleBluetooth() {
   if (SerialBT.available()) {
 
@@ -223,10 +240,14 @@ void calculatePID() {
         blackDetectStartTime = millis();
       } else if (millis() - blackDetectStartTime > requiredBlackTime) {
         // We have been on full black continuously for over 100ms! It's the finish.
+        trackFinished = true;
+        runtime = millis() - runStartTime;  // Calculate elapsed time
+        
+        // *** KEY CHANGE: Automatically stop the robot and notify the app ***
         motorRunning = false;
         driveMotors(0, 0);
-        trackFinished = true;
-        runtime = millis() - runtime;
+        SerialBT.println("TRACK_FINISHED");
+        
         return;  // Exit the function immediately
       }
     }
@@ -291,7 +312,7 @@ void startRun() {
   isTimingBlack = false;
   integral = 0;
   lastError = 0;
-  runtime = millis();
+  runtime = 0;  // Reset runtime to 0 at start
   trackFinished = false;
 
   SerialBT.println("Robot Started");
@@ -303,7 +324,11 @@ void stopRun() {
   integral = 0;
   lastError = 0;
 
-  SerialBT.println("Robot Stopped");
+  // Only send "Robot Stopped" if it was a manual stop (not auto-finish)
+  if (!trackFinished) {
+    runtime = 0;  // Manual stop, no time recorded
+    SerialBT.println("Robot Stopped");
+  }
 }
 
 
